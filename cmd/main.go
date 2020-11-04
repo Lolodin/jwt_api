@@ -1,7 +1,15 @@
 package main
 
-import "net/http"
+import (
+	"REST_API/controller"
+	"net/http"
+)
 
 func main() {
-	http.ListenAndServe(":8080", nil)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/getToken", controller.GetTokens)
+
+
+	http.ListenAndServe(":8080", mux)
 }
