@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<form action="/login">
+    <p>Login</p>
+    <input type="text" name="name" value="">
+    <br>
+    <p>Password</p>
+    <input type="text" name="password" value="">
+    <input type="hidden" name="uuid" value="">
+</form>
+<button onclick="SendForm()">LoginApp</button>
+
+
+<button onclick="Send_Refresh()">REFRESH</button>
+
+<script>
+ async function Send_Refresh() {
+        let obj = {"ref": window.RefreshToken, "uuid": window.GUID}
+        let result = await fetch("/refresh", {
+            method: "POST",
+            body: JSON.stringify(obj)
+        })
+     if (result.ok) {
+        let json = await result.json()
+         console.log(json)
+
+     }
+    }
+</script>
+<script>
+async function  SendForm() {
+    formV = document.querySelectorAll("input")
+    let map = {"name": formV[0].value, "password" : formV[1].value, "uuid" :  window.GUID}
+    console.log(map)
+   let result = await fetch("/getTokens", {
+        method: "POST",
+        body:JSON.stringify(map)
+    })
+    if (result.ok) {
+        let json = await result.json()
+        window.AccesToken = json.token
+        window.RefreshToken = json.refresh_token
+        console.log(json)
+    }
+
+}
+</script>
+<script>
+    function initFingerprintJS() {
+        FingerprintJS.load().then(fp => {
+            // The FingerprintJS agent is ready.
+            // Get a visitor identifier when you'd like to.
+            fp.get().then(result => {
+                // This is the visitor identifier:
+                const visitorId = result.visitorId;
+                window.GUID = visitorId
+                console.log(visitorId);
+            });
+        });
+    }
+</script>
+<script
+        async
+        src="//cdn.jsdelivr.net/npm/@fingerprintjs/fingerprintjs@3/dist/fp.min.js"
+        onload="initFingerprintJS()"
+></script>
+</body>
+</html>
