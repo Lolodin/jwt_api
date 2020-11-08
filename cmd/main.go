@@ -29,5 +29,5 @@ func main() {
 	mux.HandleFunc("/deleteRef", controller.DeleteRefreshToken(&store))
 	mux.HandleFunc("/deleteAll", controller.DeleteAllUserTokens(&store))
 
-	http.ListenAndServe(os.Getenv("PORT"), mux)
+	http.ListenAndServe(":"+os.Getenv("PORT"), mux)
 }
