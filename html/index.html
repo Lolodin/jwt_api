@@ -18,7 +18,40 @@
 
 <button onclick="Send_Refresh()">REFRESH</button>
 
+<button onclick="Delete_Refresh_Token()">DeleteToken</button>
+<button onclick="Delete_ALL_User_Token()">DeleteALLToken</button>
+
 <script>
+    async function Delete_ALL_User_Token() {
+        let obj = {"ref": window.RefreshToken, "uuid": window.GUID}
+        let result = await fetch("/deleteAll", {
+            method: "POST",
+            body: JSON.stringify(obj)
+        })
+        if (result.ok) {
+            let json = await result.json()
+            if (json.error != undefined) {
+                alert(json.error)
+            }
+
+
+        }
+    }
+async function Delete_Refresh_Token() {
+    let obj = {"ref": window.RefreshToken, "uuid": window.GUID}
+    let result = await fetch("/deleteRef", {
+        method: "POST",
+        body: JSON.stringify(obj)
+    })
+    if (result.ok) {
+        let json = await result.json()
+        if (json.error != undefined) {
+            alert(json.error)
+        }
+
+
+    }
+}
  async function Send_Refresh() {
         let obj = {"ref": window.RefreshToken, "uuid": window.GUID}
         let result = await fetch("/refresh", {
@@ -27,6 +60,11 @@
         })
      if (result.ok) {
         let json = await result.json()
+         if (json.error != undefined) {
+             alert(json.error)
+         }
+         window.AccesToken = json.token
+         window.RefreshToken = json.refresh_token
          console.log(json)
 
      }
@@ -41,8 +79,13 @@ async function  SendForm() {
         method: "POST",
         body:JSON.stringify(map)
     })
+
     if (result.ok) {
+
         let json = await result.json()
+        if (json.error != undefined) {
+            alert(json.error)
+        }
         window.AccesToken = json.token
         window.RefreshToken = json.refresh_token
         console.log(json)

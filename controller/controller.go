@@ -10,69 +10,76 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 )
 
 const SECRET = "TESTTESTTESTTEST"
+
 type erroranswer struct {
 	Error string `json:"error"`
 }
 
 type UserData struct {
-	UUID string `json:"uuid"`
-	Name string `json:"name"`
+	UUID     string `json:"uuid"`
+	Name     string `json:"name"`
 	Password string `json:"password"`
 }
 type Refresh struct {
 	Ref string `json:"ref"`
-
 }
 type Token struct {
-	Exp int64 `json:"exp"`
+	Exp  int64  `json:"exp"`
 	Name string `json:"name"`
 	UUID string `json:"uuid"`
 }
+
 //Получение токена доступа и обновления
 func GetTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("GetTokens")
 		user := UserData{}
-		buff, err :=ioutil.ReadAll(r.Body)
+		buff, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			fmt.Println(err)
 		}
 		json.Unmarshal(buff, &user)
 		fmt.Println(user)
 
-
 		//check pass
-		DBuser:=s.GetUser(user.Name)
+		DBuser := s.GetUser(user.Name)
 		if DBuser == nil {
-			w.Write([]byte("Wrong User"))
+
+			err, _ := json.Marshal(erroranswer{Error: "user not found"})
+			w.Write(err)
 			return
 		}
 
-		res := bcrypt.CompareHashAndPassword(DBuser.Password,[]byte(user.Password))
+		res := bcrypt.CompareHashAndPassword(DBuser.Password, []byte(user.Password))
 		if res != nil {
-			http.Error(w, "User non exist", 404 )
+
+			err, _ := json.Marshal(erroranswer{Error: "Password not correct"})
+			w.Write(err)
 			return
 		}
 		//checkSession uuid
 		s.DeleteSession(user.UUID)
 		//Access Token
 
-		m:= GenerateTokens(user.UUID, user.Name, s)
-		jst, err:=json.Marshal(m)
+		m := GenerateTokens(user.UUID, user.Name, s)
+		m["error"] = "Tokens send"
+		jst, err := json.Marshal(m)
 		if err != nil {
 			log.Print(err)
 		}
 		w.Write(jst)
+		log.Println("TOKENS SEND USER")
 	}
 
-
 }
+
 //Страница для теста запросов
-func Index()  func(w http.ResponseWriter, r *http.Request) {
+func Index() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("indexAction")
 		t, _ := template.ParseFiles("html/index.html")
@@ -82,10 +89,10 @@ func Index()  func(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-
 }
+
 //Страница для регистрации юзера
-func Reg()  func(w http.ResponseWriter, r *http.Request) {
+func Reg() func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("regAction")
 		t, _ := template.ParseFiles("html/reg.html")
@@ -95,14 +102,14 @@ func Reg()  func(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-
 }
+
 //Маршрут для регистрации
 func Register(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Register")
 		user := UserData{}
-		buff, err :=ioutil.ReadAll(r.Body)
+		buff, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -112,7 +119,6 @@ func Register(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) 
 
 	}
 
-
 }
 
 //Обновляем Токены
@@ -120,48 +126,197 @@ func RefreshTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Requ
 	return func(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("RefTokens")
 		ref := Refresh{}
-		buff, err :=ioutil.ReadAll(r.Body)
+		buff, err := ioutil.ReadAll(r.Body)
 		if err != nil {
 			fmt.Println(err)
 		}
 		json.Unmarshal(buff, &ref)
+		ref.Ref = DecodeBase64(ref.Ref)
 		fmt.Println(ref)
 
 		//RefreshToken сравниваем с токеном из БД
 
-		token, err:=jwt.Parse(ref.Ref, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.Parse(ref.Ref, func(token *jwt.Token) (interface{}, error) {
 			return []byte(SECRET), nil
 		})
 		if err != nil {
 			fmt.Println(err)
 		}
 		if token.Valid {
-			claims:=token.Claims.(jwt.MapClaims)
+			claims := token.Claims.(jwt.MapClaims)
 			uuid := claims["uuid"].(string)
-			exp  := claims["exp"].(int64)
+			exp := claims["exp"].(string)
+			expint, err := strconv.Atoi(exp)
+			if err != nil {
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+
 			// Получаем сессию из БД и удаляем в любом случае
-
-			session:=s.GetSession(uuid)
+			fmt.Println(uuid)
+			session := s.GetSession(uuid)
 			s.DeleteSession(uuid)
-			check:=bcrypt.CompareHashAndPassword(session.RefToken, []byte(ref.Ref))
+			if session == nil {
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+			check := bcrypt.CompareHashAndPassword(session.RefToken, []byte(ref.Ref))
 			if check != nil {
-				err, _:=json.Marshal(erroranswer{Error: check.Error()})
+
+				err, _ := json.Marshal(erroranswer{Error: check.Error()})
 				w.Write(err)
 				return
 			}
 
+			if int64(expint) <= time.Now().Unix() {
 
-			if exp<= time.Now().Unix() {
-				err, _:=json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
-			newtoken:=GenerateTokens(session.UUID, session.Name, s)
-			
+			newtoken := GenerateTokens(session.UUID, session.Name, s)
+			newtoken["error"] = "Tokens updated"
+			js, err := json.Marshal(newtoken)
+			if err != nil {
+
+				err, _ := json.Marshal(erroranswer{Error: "Error created token"})
+				w.Write(err)
+				return
+			}
+			w.Write(js)
+			log.Println("Tokens updated")
 
 		}
 
 	}
 
+}
+
+func DeleteRefreshToken(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ref := Refresh{}
+		buff, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			fmt.Println(err)
+		}
+		json.Unmarshal(buff, &ref)
+		ref.Ref = DecodeBase64(ref.Ref)
+		fmt.Println(ref)
+
+		//RefreshToken сравниваем с токеном из БД
+
+		token, err := jwt.Parse(ref.Ref, func(token *jwt.Token) (interface{}, error) {
+			return []byte(SECRET), nil
+		})
+		if err != nil {
+			fmt.Println(err)
+		}
+		if token.Valid {
+			claims := token.Claims.(jwt.MapClaims)
+			uuid := claims["uuid"].(string)
+			exp := claims["exp"].(string)
+			expint, err := strconv.Atoi(exp)
+			if err != nil {
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+
+			// Получаем сессию из БД и удаляем в любом случае
+			fmt.Println(uuid)
+			session := s.GetSession(uuid)
+			s.DeleteSession(uuid)
+			if session == nil {
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+			check := bcrypt.CompareHashAndPassword(session.RefToken, []byte(ref.Ref))
+			if check != nil {
+
+				err, _ := json.Marshal(erroranswer{Error: check.Error()})
+				w.Write(err)
+				return
+			}
+
+			if int64(expint) <= time.Now().Unix() {
+
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+
+			answer, _ := json.Marshal(erroranswer{Error: "Refresh Token Delete"})
+			w.Write(answer)
+			log.Println("TOKEN DELETE")
+
+		}
+
+	}
+
+}
+func DeleteAllUserTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ref := Refresh{}
+		buff, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			fmt.Println(err)
+		}
+		json.Unmarshal(buff, &ref)
+		ref.Ref = DecodeBase64(ref.Ref)
+		fmt.Println(ref)
+
+		//RefreshToken сравниваем с токеном из БД
+
+		token, err := jwt.Parse(ref.Ref, func(token *jwt.Token) (interface{}, error) {
+			return []byte(SECRET), nil
+		})
+		if err != nil {
+			fmt.Println(err)
+		}
+		if token.Valid {
+			claims := token.Claims.(jwt.MapClaims)
+			uuid := claims["uuid"].(string)
+			exp := claims["exp"].(string)
+			expint, err := strconv.Atoi(exp)
+			if err != nil {
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+
+			// Получаем сессию из БД и удаляем в любом случае
+			fmt.Println(uuid)
+			session := s.GetSession(uuid)
+			s.DeleteSession(uuid)
+			if session == nil {
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+			check := bcrypt.CompareHashAndPassword(session.RefToken, []byte(ref.Ref))
+			if check != nil {
+
+				err, _ := json.Marshal(erroranswer{Error: check.Error()})
+				w.Write(err)
+				return
+			}
+
+			if int64(expint) <= time.Now().Unix() {
+
+				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				w.Write(err)
+				return
+			}
+			s.DeleteAllSessions(session.Name)
+			answer, _ := json.Marshal(erroranswer{Error: "Delete All Tokens"})
+			w.Write(answer)
+			log.Println("TOKEN DELETE")
+
+		}
+
+	}
 
 }
