@@ -5,6 +5,7 @@
     <title>Title</title>
 </head>
 <body>
+<a href="/reg">Register</a>
 <form action="/login">
     <p>Login</p>
     <input type="text" name="name" value="">
@@ -24,14 +25,14 @@
 <script>
     async function Delete_ALL_User_Token() {
         let obj = {"ref": window.RefreshToken, "uuid": window.GUID}
-        let result = await fetch("/deleteAll", {
+        let result = await fetch("/logoutAll", {
             method: "POST",
             body: JSON.stringify(obj)
         })
         if (result.ok) {
             let json = await result.json()
-            if (json.error != undefined) {
-                alert(json.error)
+            if (json.status != undefined) {
+                alert(json.status)
             }
 
 
@@ -39,14 +40,14 @@
     }
 async function Delete_Refresh_Token() {
     let obj = {"ref": window.RefreshToken, "uuid": window.GUID}
-    let result = await fetch("/deleteRef", {
+    let result = await fetch("/logout", {
         method: "POST",
         body: JSON.stringify(obj)
     })
     if (result.ok) {
         let json = await result.json()
-        if (json.error != undefined) {
-            alert(json.error)
+        if (json.status != undefined) {
+            alert(json.status)
         }
 
 
@@ -60,8 +61,8 @@ async function Delete_Refresh_Token() {
         })
      if (result.ok) {
         let json = await result.json()
-         if (json.error != undefined) {
-             alert(json.error)
+         if (json.status != undefined) {
+             alert(json.status)
          }
          window.AccesToken = json.token
          window.RefreshToken = json.refresh_token
@@ -75,7 +76,7 @@ async function  SendForm() {
     formV = document.querySelectorAll("input")
     let map = {"name": formV[0].value, "password" : formV[1].value, "uuid" :  window.GUID}
     console.log(map)
-   let result = await fetch("/getTokens", {
+   let result = await fetch("/login", {
         method: "POST",
         body:JSON.stringify(map)
     })
@@ -83,8 +84,8 @@ async function  SendForm() {
     if (result.ok) {
 
         let json = await result.json()
-        if (json.error != undefined) {
-            alert(json.error)
+        if (json.status != undefined) {
+            alert(json.status)
         }
         window.AccesToken = json.token
         window.RefreshToken = json.refresh_token

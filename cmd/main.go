@@ -21,13 +21,13 @@ func main() {
 	store := store2.NewMongoStore(client)
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/getTokens", controller.GetTokens(&store))
+	mux.HandleFunc("/login", controller.Login(&store))
 	mux.HandleFunc("/", controller.Index())
 	mux.HandleFunc("/reg", controller.Reg())
 	mux.HandleFunc("/register", controller.Register(&store))
 	mux.HandleFunc("/refresh", controller.RefreshTokens(&store))
-	mux.HandleFunc("/deleteRef", controller.DeleteRefreshToken(&store))
-	mux.HandleFunc("/deleteAll", controller.DeleteAllUserTokens(&store))
+	mux.HandleFunc("/logout", controller.LogOut(&store))
+	mux.HandleFunc("/logoutAll", controller.LogOutAll(&store))
 
-	http.ListenAndServe(":"+os.Getenv("PORT"), mux)
+	http.ListenAndServe(os.Getenv("PORT"), mux)
 }

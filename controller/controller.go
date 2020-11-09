@@ -14,10 +14,10 @@ import (
 	"time"
 )
 
-const SECRET = "TESTTESTTESTTEST"
+const SECRET = "TEST"
 
-type erroranswer struct {
-	Error string `json:"error"`
+type status struct {
+	Status string `json:"status"`
 }
 
 type UserData struct {
@@ -35,9 +35,9 @@ type Token struct {
 }
 
 //Получение токена доступа и обновления
-func GetTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
+func Login(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println("GetTokens")
+		fmt.Println("Login")
 		user := UserData{}
 		buff, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -50,7 +50,7 @@ func GetTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request)
 		DBuser := s.GetUser(user.Name)
 		if DBuser == nil {
 
-			err, _ := json.Marshal(erroranswer{Error: "user not found"})
+			err, _ := json.Marshal(status{Status: "user not found"})
 			w.Write(err)
 			return
 		}
@@ -58,7 +58,7 @@ func GetTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request)
 		res := bcrypt.CompareHashAndPassword(DBuser.Password, []byte(user.Password))
 		if res != nil {
 
-			err, _ := json.Marshal(erroranswer{Error: "Password not correct"})
+			err, _ := json.Marshal(status{Status: "Password not correct"})
 			w.Write(err)
 			return
 		}
@@ -67,7 +67,10 @@ func GetTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request)
 		//Access Token
 
 		m := GenerateTokens(user.UUID, user.Name, s)
-		m["error"] = "Tokens send"
+		if m == nil {
+			json.Marshal(status{Status: ""})
+		}
+		m["status"] = "Tokens send"
 		jst, err := json.Marshal(m)
 		if err != nil {
 			log.Print(err)
@@ -148,7 +151,7 @@ func RefreshTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Requ
 			exp := claims["exp"].(string)
 			expint, err := strconv.Atoi(exp)
 			if err != nil {
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
@@ -158,30 +161,35 @@ func RefreshTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Requ
 			session := s.GetSession(uuid)
 			s.DeleteSession(uuid)
 			if session == nil {
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
 			check := bcrypt.CompareHashAndPassword(session.RefToken, []byte(ref.Ref))
 			if check != nil {
 
-				err, _ := json.Marshal(erroranswer{Error: check.Error()})
+				err, _ := json.Marshal(status{Status: check.Error()})
 				w.Write(err)
 				return
 			}
 
 			if int64(expint) <= time.Now().Unix() {
 
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
 			newtoken := GenerateTokens(session.UUID, session.Name, s)
-			newtoken["error"] = "Tokens updated"
+			if newtoken == nil {
+				err, _ := json.Marshal(status{Status: "Error created token"})
+				w.Write(err)
+				return
+			}
+			newtoken["status"] = "Tokens updated"
 			js, err := json.Marshal(newtoken)
 			if err != nil {
 
-				err, _ := json.Marshal(erroranswer{Error: "Error created token"})
+				err, _ := json.Marshal(status{Status: "Error created token"})
 				w.Write(err)
 				return
 			}
@@ -194,7 +202,7 @@ func RefreshTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Requ
 
 }
 
-func DeleteRefreshToken(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
+func LogOut(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ref := Refresh{}
 		buff, err := ioutil.ReadAll(r.Body)
@@ -219,7 +227,7 @@ func DeleteRefreshToken(s *store.MongoStore) func(w http.ResponseWriter, r *http
 			exp := claims["exp"].(string)
 			expint, err := strconv.Atoi(exp)
 			if err != nil {
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
@@ -229,26 +237,26 @@ func DeleteRefreshToken(s *store.MongoStore) func(w http.ResponseWriter, r *http
 			session := s.GetSession(uuid)
 			s.DeleteSession(uuid)
 			if session == nil {
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
 			check := bcrypt.CompareHashAndPassword(session.RefToken, []byte(ref.Ref))
 			if check != nil {
 
-				err, _ := json.Marshal(erroranswer{Error: check.Error()})
+				err, _ := json.Marshal(status{Status: check.Error()})
 				w.Write(err)
 				return
 			}
 
 			if int64(expint) <= time.Now().Unix() {
 
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
 
-			answer, _ := json.Marshal(erroranswer{Error: "Refresh Token Delete"})
+			answer, _ := json.Marshal(status{Status: "Refresh Token Delete"})
 			w.Write(answer)
 			log.Println("TOKEN DELETE")
 
@@ -257,7 +265,7 @@ func DeleteRefreshToken(s *store.MongoStore) func(w http.ResponseWriter, r *http
 	}
 
 }
-func DeleteAllUserTokens(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
+func LogOutAll(s *store.MongoStore) func(w http.ResponseWriter, r *http.Request) {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ref := Refresh{}
 		buff, err := ioutil.ReadAll(r.Body)
@@ -282,7 +290,7 @@ func DeleteAllUserTokens(s *store.MongoStore) func(w http.ResponseWriter, r *htt
 			exp := claims["exp"].(string)
 			expint, err := strconv.Atoi(exp)
 			if err != nil {
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
@@ -292,26 +300,26 @@ func DeleteAllUserTokens(s *store.MongoStore) func(w http.ResponseWriter, r *htt
 			session := s.GetSession(uuid)
 			s.DeleteSession(uuid)
 			if session == nil {
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
 			check := bcrypt.CompareHashAndPassword(session.RefToken, []byte(ref.Ref))
 			if check != nil {
 
-				err, _ := json.Marshal(erroranswer{Error: check.Error()})
+				err, _ := json.Marshal(status{Status: check.Error()})
 				w.Write(err)
 				return
 			}
 
 			if int64(expint) <= time.Now().Unix() {
 
-				err, _ := json.Marshal(erroranswer{Error: "refresh token not valid"})
+				err, _ := json.Marshal(status{Status: "refresh token not valid"})
 				w.Write(err)
 				return
 			}
 			s.DeleteAllSessions(session.Name)
-			answer, _ := json.Marshal(erroranswer{Error: "Delete All Tokens"})
+			answer, _ := json.Marshal(status{Status: "Delete All Tokens"})
 			w.Write(answer)
 			log.Println("TOKEN DELETE")
 

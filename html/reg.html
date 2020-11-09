@@ -5,6 +5,7 @@
     <title>Title</title>
 </head>
 <body>
+<a href="/">Login</a>
 <form action="/login">
     <p>Login</p>
     <input type="text" name="name" value="">
@@ -29,7 +30,8 @@ async function  SendForm() {
         body:JSON.stringify(map)
     })
     if (result.ok) {
-       alert(map)
+
+       alert("Registration complete")
     }
 
 }

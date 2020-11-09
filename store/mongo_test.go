@@ -16,7 +16,7 @@ func TestMongoStore_AddUser(t *testing.T) {
 		t.Error(err)
 	}
 	s := NewMongoStore(client)
-	s.AddUser("testuser", "123456")
+	s.AddUser("Trans", "123456")
 }
 func TestMongoStore_GetUser(t *testing.T) {
 	client, err := mongo.NewClient(options.Client().ApplyURI(connectMongo))

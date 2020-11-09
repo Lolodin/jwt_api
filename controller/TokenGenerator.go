@@ -24,7 +24,9 @@ func GenerateTokens(uuid, name string, s *store.MongoStore) map[string]string {
 		log.Println(err)
 	}
 	// Запись сессии в БД
-	s.AddSession(name, uuid, bref, exp)
+	if err:=s.AddSession(name, uuid, bref, exp); err != nil{
+		return nil
+	}
 	m := make(map[string]string)
 	m["token"] = a
 	m["refresh_token"] = r
