@@ -29,5 +29,5 @@ func main() {
 	mux.HandleFunc("/logout", controller.LogOut(&store))
 	mux.HandleFunc("/logoutAll", controller.LogOutAll(&store))
 
-	http.ListenAndServe(os.Getenv("PORT"), mux)
+	http.ListenAndServe(":"+os.Getenv("PORT"), mux)
 }
